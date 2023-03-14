@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="./css/all.css" rel="stylesheet" />
+    <link href="./css/bulma.css" rel="stylesheet" />
+    <script src="./js/all.js"></script>
+    <script src="./js/vue.js"></script>
+    <title>My ToDo List </title>
+  </head>
+  <body>
+    <section id="app">
+      <section class="hero">
+        <div class="hero-body">
+          <p class="title">
+            My ToDo List 
+            <span class="icon is-size-4" style="border-radius:100%; border:3px solid black; padding:15px" v-on:click="addNewList()">
+              <i class="fas fa-plus"></i>
+            </span>
+          </p>
+          <!-- <p class="subtitle">Hero subtitle</p> -->
+        </div>
+      </section>
+      <div class="container">
+        <p class="subtitle my-2">Completed: {{numComplete}} Tasks</p>
+        <p class="subtitle my-2">Incomplete: {{numIncomplete}} Tasks</p>
+        <p class="subtitle my-2">Flagged: {{numFlagged}} Tasks</p>
+        <div class="columns mt-5 box" v-for="(list, index) in listSort" v-bind:key="list.id">
+          <div class="column is-8">
+            <p class="title">
+              {{list.name}}
+              <span class="icon is-size-5 pl-3" v-on:click="editList(list)">
+                <i class="fas fa-edit"></i>
+              </span>
+              <span class="icon is-size-5 pl-3" v-on:click="deleteList(list)">
+                <i class="fas fa-trash-alt"></i>
+              </span>
+            </p>
+            <div class="box level py-3 my-2" v-for="task in filteredTasks" v-bind:key="task.id" v-if="(list.id == task.listId)">
+              <div class="control">
+                <label class="checkbox">
+                  <input type="checkbox" v-model="task.isComplete"/>
+                  <span v-bind:style="{'text-decoration': task.isComplete ? 'line-through' : 'none', 'color': task.color}">{{task.name}}
+                    <div class="fas fa-flag"  v-bind:style="{'text-decoration': task.isComplete ? 'line-through' : 'none'}" v-if="task.flag === true"></div>
+                  </span>
+                  <span v-show="task.date != ''" v-bind:style="{'text-decoration': task.isComplete ? 'line-through' : 'none', 'color': task.color}">
+                    (Due by {{task.date}})
+                  </span>
+                </label>
+              </div>
+              <div class="level-right">
+                <span class="icon is-small" v-on:click="editTask(task)">
+                  <i class="fas fa-edit"></i>
+                </span>
+                <span class="icon is-small ml-5" v-on:click="deleteTask(task)">
+                  <i class="fas fa-trash-alt"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="column is-4">
+            <div class="card">
+              <header class="card-header has-background-primary">
+                <p class="card-header-title">Filters</p>
+                <p class="card-header-icon">
+                  <span class="card-header-icon icon">
+                    <i class="fas fa-filter"></i>
+                  </span>
+                </p>
+              </header>
+              <div class="card-content">
+                <div class="content">
+                  <div class="control">
+                    <label class="checkbox">
+                      <input type="checkbox" v-model="hideComplete[index]"/>
+                      Hide completed tasks
+                    </label>
+                  </div>
+                  <div class="control">
+                    <label class="checkbox">
+                      <input type="checkbox" v-model="showFlagged[index]"/>
+                      Show only flagged tasks
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card mt-3">
+              <header class="card-header has-background-primary">
+                <p class="card-header-title">Sort</p>
+                <p class="card-header-icon">
+                  <span class="card-header-icon icon">
+                    <i class="fas fa-filter"></i>
+                  </span>
+                </p>
+              </header>
+              <div class="card-content">
+                <div class="content">
+                  <div class="control">
+                    <label class="checkbox">
+                      <input type="radio" :name="index" v-model="sortBy[index]" value="sortByAlphabet"/>
+                      Sort alphabetically
+                    </label>
+                  </div>
+                  <div class="control">
+                    <label class="checkbox">
+                      <input type="radio" :name="index" v-model="sortBy[index]" value="sortByIncomplete"/>
+                      Sort incomplete tasks
+                    </label>
+                  </div>
+                  <div class="control">
+                    <label class="checkbox">
+                      <input type="radio" :name="index" v-model="sortBy[index]" value="sortByFlagged"/>
+                      Sort flagged task first
+                    </label>
+                  </div>
+                  <div class="control">
+                    <label class="checkbox">
+                      <input type="radio" :name="index" v-model="sortBy[index]" value="sortByDueDate"/>
+                      Sort by due date (ascending)
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="container mt-5">
+        <div class="title is-size-5">ADD NEW TASK</div>
+        <div class="columns">
+            <div class="column is-4">
+              <div class="field">
+                <div class="control">
+                  <input class="input" type="text" placeholder="Task Name" v-model="newTaskName" @input="validateTaskName()">
+                  <span class="has-text-danger">{{error.taskNameError}}</span>
+                </div>
+              </div>
+            </div>
+            <div class="column is-2">
+              <div class="select">
+                <select v-model="newDropdown" v-on:change="validateNewDropdown()">
+                  <option value="0">--Select list--</option>
+                  <option v-for="list in todoLists" v-bind:value="list.id">{{list.name}}</option>
+                </select>
+              </div>
+              <div class="has-text-danger">{{error.newDropdownError}}</div>
+            </div>
+            <div class="column is-2">
+              <p class="control">
+                <input class="input is-active" type="date" v-model="newDueDate">
+              </p>
+            </div>
+            <div class="column is-1 mt-3">
+                <label class="checkbox label">
+                  <input type="checkbox" v-model="newFlag">
+                  Flag
+                </label>
+            </div>
+            <div class="column is-2" style="display:inline-block">
+              <button class="button is-black mr-2" style="border-radius:100%" v-on:click="selectColor('black')">
+                <div class="icon is-small" v-bind:key="newBlack">
+                  <div class="fas fa-check" v-if="newBlack == true"></div>
+                </div>
+              </button>
+              <button class="button is-danger mr-2" style="border-radius:100%" v-on:click="selectColor('red')">
+                <span class="icon is-small" v-bind:key="newRed">
+                  <div class="fas fa-check" v-if="newRed == true"></div>
+                </span>
+              </button>
+              <button class="button is-success" style="border-radius:100%" v-on:click="selectColor('green')">
+                <span class="icon" v-bind:key="newGreen">
+                  <div class="fas fa-check" v-if="newGreen == true"></div>
+                </span>
+              </button>
+              <br>
+              <span class="has-text-danger">{{error.colorError}}</span>
+            </div>
+            <div class="column is-1">
+              <p class="control">
+                <a class="button is-info" v-on:click="addTask()"> Add New Task </a>
+              </p>
+            </div>
+        </div>
+      </div>
+      
+      <div class="modal" v-bind:class="{'is-active': showEditModal}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Edit Task</p>
+            <button class="delete" aria-label="close" v-on:click="showEditModal = false"></button>
+          </header>
+          <section class="modal-card-body">
+            <!-- Content ... -->
+            <div class="columns">
+              <div class="column is-8">
+                <input class="input" type="text" v-model="editTaskName" @input="validateEditTaskName()">
+              </div>
+              <div class="column is-4">
+                <div class="select">
+                  <select v-model="editDropdown" v-on:change="validateEditDropdown()">
+                    <option value="0">--Select list--</option>
+                    <option v-for="list in todoLists" v-bind:value="list.id">{{list.name}}</option>
+                  </select>
+                </div>
+                <div class="has-text-danger">{{error.editDropdownError}}</div>
+              </div>
+            </div>
+            <span class="has-text-danger">{{error.editTaskNameError}}</span>
+            <div class="columns mt-2">
+              <div class="column is-5">
+                <p class="control">
+                  <input class="input is-active" type="date" v-model="editDueDate">
+                </p>
+              </div>
+              <div class="column is-2 mt-3">
+                  <label class="checkbox">
+                    <input type="checkbox" v-model="editFlag">
+                    Flag
+                  </label>
+              </div>
+              <div class="column is-5" style="display:inline-block">
+                <button class="button is-black mr-2" style="border-radius:100%" v-on:click="selectColor2('black')">
+                  <div class="icon is-small" v-bind:key="editBlack">
+                    <div class="fas fa-check" v-if="editBlack == true"></div>
+                  </div>
+                </button>
+                <button class="button is-danger mr-2" style="border-radius:100%" v-on:click="selectColor2('red')">
+                  <span class="icon is-small" v-bind:key="editRed">
+                    <div class="fas fa-check" v-if="editRed == true"></div>
+                  </span>
+                </button>
+                <button class="button is-success" style="border-radius:100%" v-on:click="selectColor2('green')">
+                  <span class="icon" v-bind:key="editGreen">
+                    <div class="fas fa-check" v-if="editGreen == true"></div>
+                  </span>
+                </button>
+                <br>
+                <span class="has-text-danger">{{error.editColorError}}</span>
+              </div>
+            </div>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-success" v-on:click="saveEditTask">Save</button>
+            <button class="button" v-on:click="showEditModal = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <div class="modal" v-bind:class="{'is-active': showDeleteModal}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Delete Task</p>
+            <button class="delete" aria-label="close" v-on:click="showDeleteModal = false"></button>
+          </header>
+          <section class="modal-card-body">
+            <!-- Content ... -->
+            Are you sure you want to delete "{{deleteTaskName}}"?
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-danger" v-on:click="confirmDeleteTask">Confirm</button>
+            <button class="button" v-on:click="showDeleteModal = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <div class="modal" v-bind:class="{'is-active': showNewListModal}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">New List</p>
+            <button class="delete" aria-label="close" v-on:click="showNewListModal = false"></button>
+          </header>
+          <section class="modal-card-body">
+            <!-- Content ... -->
+            <input type="text" class="input" v-model="newListName" @input="validateNewListName()">
+            <span class="has-text-danger">{{error.newListName}}</span>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-success" v-on:click="confirmNewList">Confirm</button>
+            <button class="button" v-on:click="showNewListModal = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <div class="modal" v-bind:class="{'is-active': showEditListModal}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Edit List</p>
+            <button class="delete" aria-label="close" v-on:click="showEditListModal = false"></button>
+          </header>
+          <section class="modal-card-body">
+            <!-- Content ... -->
+            <input type="text" class="input" v-model="editListName" @input="validateEditListName()">
+            <span class="has-text-danger">{{error.editListName}}</span>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-success" v-on:click="saveEditList">Confirm</button>
+            <button class="button" v-on:click="showEditListModal = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <div class="modal" v-bind:class="{'is-active': showDeleteListModal}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Edit List</p>
+            <button class="delete" aria-label="close" v-on:click="showDeleteListModal = false"></button>
+          </header>
+          <section class="modal-card-body">
+            <!-- Content ... -->
+            Are you sure that you want to delete "{{deleteListName}}"?
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-success" v-on:click="confirmDeleteList">Confirm</button>
+            <button class="button" v-on:click="showDeleteListModal = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+    </section>
+    
+    <script>
+      var app = new Vue({
+        el: "#app",
+        data: {
+          todoLists: [
+            { id: 1, name: "ToDo List" },
+            { id: 2, name: "Not ToDo List"},
+          ],
+          tasks: [
+            {id: 1, listId:1, name: 'Item 1', isComplete: false, date: '', color:'black', flag: false},
+            {id: 2, listId:2, name: 'Item 2', isComplete: false, date: '', color:'black', flag: true},
+            {id: 3, listId:1, name: 'Item 3', isComplete: false, date: '', color:'black', flag: false},
+            {id: 4, listId:2, name: 'Item 4', isComplete: false, date: '', color:'black', flag: false},
+            {id: 5, listId:1, name: 'Item 5', isComplete: false, date: '', color:'black', flag: false},
+            {id: 6, listId:2, name: 'Item 6', isComplete: false, date: '', color:'black', flag: true}
+          ],
+          error: [
+            taskNameError = '',
+            colorError = '',
+            editTaskNameError = '',
+            editColorError = '',
+            newListName = '',
+            editListName = '',
+            newDropdownError = '',
+            editDropdownError = ''
+          ],
+          newTaskName: '',
+          newDueDate: '',
+          newFlag: false,
+          newBlack: true,
+          newRed: false,
+          newGreen: false,
+          newSelectColor: 'black',
+          idCounter: 0,
+          showEditModal: false,
+          editTaskName: '',
+          editTaskid: null,
+          editDueDate: null,
+          editFlag: false,
+          editBlack: false,
+          editRed: false,
+          editGreen: false,
+          editSelectColor: '',
+          deleteTaskName: '',
+          showDeleteModal: false,
+          deleteTaskid: null,
+          hideComplete: [false, false],
+          sortIncompleteFirst: [false, false],
+          showFlagged: [false, false],
+          sortBy: ['sortByAlphabet', 'sortByAlphabet'],
+          showNewListModal: false,
+          listCounter: 0,
+          newListName: '',
+          showEditListModal: false,
+          editListName: '',
+          editListId: 0,
+          showDeleteListModal: false,
+          deleteListName: '',
+          deleteListId: 0,
+          newDropdown: 0,
+          editDropdown: 0
+        },
+        created (){
+          this.idCounter = this.tasks.length
+          this.listCounter = this.todoLists.length
+          this.todoLists.sort()
+        },
+        computed: {
+          numComplete() {
+            const count = this.tasks.filter((val) => val.isComplete === true).length
+            return count
+          },
+          numIncomplete() {
+            return this.tasks.length - this.numComplete
+          },
+          numFlagged(){
+            const count = this.tasks.filter((val) => val.flag === true).length
+            return count
+          },
+          filteredTasks() {
+            function alphabetSorter(a, b){
+              if(a.name.toLowerCase() < b.name.toLowerCase()){
+                return -1
+              }
+              else if(a.name.toLowerCase() > b.name.toLowerCase()){
+                return 1
+              }
+              else{
+                return 0
+              }
+            }
+            function compare(a, b){
+              if(a.isComplete == false && b.isComplete == true){
+                return -1
+              }
+              else if(a.isComplete == true && b.isComplete == false){
+                return 1
+              }
+              else{
+                return 0
+              }
+            }
+            function flaggedSorter(a, b){
+              if(a.flag == true && b.flag == false){
+                return -1
+              }
+              else if(a.flag == false && b.flag == true){
+                return 1
+              }
+              else{
+                return 0
+              }
+            }
+            function dueDateSorter(a, b){
+              if(a.date == "" && b.date != ""){
+                return 1
+              }
+              else if(a.date != "" && b.date == ""){
+                return -1
+              }
+              else if(a.date < b.date){
+                return -1
+              }
+              else if(a.date > b.date){
+                return 1
+              }
+              else{
+                return 0
+              }
+            }
+            function listIdSorter(a, b){
+              if(a.listId < b.listId){
+                return -1
+              }
+              else if(a.listId > b.listId){
+                return 1
+              }
+              else{
+                return 0
+              }
+            }
+
+            this.tasks.sort(alphabetSorter)
+            this.tasks.sort(listIdSorter)
+
+            var alltasks = []
+
+            for(var i=0; i<this.todoLists.length; i++){
+              
+              var listTask = this.tasks.filter((val) => val.listId == this.todoLists[i].id)
+              
+              if(this.sortBy[i] == 'sortByAlphabet'){
+                listTask.sort(alphabetSorter)
+              }
+              else if(this.sortBy[i] == 'sortByIncomplete'){
+                listTask.sort(compare)
+              }
+              else if(this.sortBy[i] == 'sortByFlagged'){
+                listTask.sort(flaggedSorter)
+              }
+              else if(this.sortBy[i] == 'sortByDueDate'){
+                listTask.sort(dueDateSorter)
+              }
+              
+              if(this.hideComplete[i] === true){
+                listTask = listTask.filter((val) => val.isComplete === false)
+              }
+  
+              if(this.showFlagged[i] === true){
+                listTask = listTask.filter((val) => val.flag === true)
+              }
+              
+              for(var j=0; j<listTask.length; j++){
+                alltasks.splice(alltasks.length, 0, listTask[j])
+              }
+              
+            }
+
+            return alltasks
+
+          },
+          listSort(){
+            function alphabetSorter(a, b){
+              if(a.name.toLowerCase() < b.name.toLowerCase()){
+                return -1
+              }
+              else if(a.name.toLowerCase() > b.name.toLowerCase()){
+                return 1
+              }
+              else{
+                return 0
+              }
+            }
+            return this.todoLists.sort(alphabetSorter)
+          }
+        },
+        methods: {
+          addTask(){
+            this.validateTaskName()
+            if(this.newTaskName == ''|| this.newSelectColor == '' || this.newDropdown == '0'){
+              alert('กรุณาแก้ไข')
+              return 
+            }
+            this.idCounter++
+            const newTask = {id: this.idCounter, listId:this.newDropdown, name: this.newTaskName, isComplete: false, date: this.newDueDate, color: this.newSelectColor, flag: this.newFlag}
+            this.tasks.push(newTask);
+            this.newTaskName = ''
+            this.newDropdown = '0'
+            this.newDueDate = ''
+            this.newFlag = false
+            this.newBlack = true
+            this.newRed = false
+            this.newGreen = false
+            this.newSelectColor = 'balck'
+          },
+          editTask(task){
+            this.showEditModal = true
+            this.editTaskName = task.name
+            this.editTaskid = task.id
+            this.editDueDate = task.date
+            this.editFlag = task.flag
+            this.editDropdown = task.listId
+            if(task.color == 'black'){
+              this.editBlack = true
+              this.editRed = false
+              this.editGreen = false
+              this.editSelectColor = 'black'
+            }
+            else if(task.color == 'red'){
+              this.editBlack = false
+              this.editRed = true
+              this.editGreen = false
+              this.editSelectColor = 'red'
+            }
+            else if(task.color == 'green'){
+              this.editBlack = false
+              this.editRed = false
+              this.editGreen = true
+              this.editSelectColor = 'green'
+            }
+          },
+          editList(list){
+            this.showEditListModal = true
+            this.editListName = list.name
+            this.editListId = list.id
+          },
+          saveEditTask(){
+            if(this.editTaskName == '' || this.editSelectColor == ''){
+              alert('กรุณาแก้ไข')
+              return
+            }
+            let task = this.tasks.find((val) => val.id === this.editTaskid)
+            task.name = this.editTaskName
+            task.date = this.editDueDate
+            task.flag = this.editFlag
+            task.color = this.editSelectColor
+            task.listId = this.editDropdown
+
+            this.showEditModal = false
+          },
+          saveEditList(){
+            if(this.editListName == ''){
+              alert('กรุณากรอกชื่อ')
+              return
+            }
+            let list = this.todoLists.find((val) => val.id == this.editListId)
+            list.name = this.editListName
+
+            this.showEditListModal = false
+          },
+          deleteTask(task){
+            this.showDeleteModal = true
+            this.deleteTaskName = task.name
+            this.deleteTaskid = task.id
+          },
+          deleteList(list){
+            this.showDeleteListModal = true
+            this.deleteListName = list.name
+            this.deleteListId = list.id
+          },
+          confirmDeleteList(){
+            let index = this.todoLists.findIndex((val) => val.id === this.deleteListId)
+            this.tasks = this.tasks.filter((val) => val.listId != this.deleteListId)
+            this.todoLists.splice(index, 1)
+            this.hideComplete.splice(index, 1)
+            this.showFlagged.splice(index, 1)
+            this.sortBy.splice(index, 1)
+            this.showDeleteListModal = false
+          },
+          confirmDeleteTask(){
+            let index = this.tasks.findIndex((val) => val.id === this.deleteTaskid)
+            this.tasks.splice(index, 1)
+            this.showDeleteModal = false
+          },
+          selectColor(color){
+            if(color == 'black'){
+              this.newRed = false
+              this.newBlack = !this.newBlack
+              this.newGreen = false
+              this.newSelectColor = 'black'
+            }
+            else if(color == 'red'){
+              this.newRed = !this.newRed
+              this.newBlack = false
+              this.newGreen = false
+              this.newSelectColor = 'red'
+            }
+            else if(color == 'green'){
+              this.newRed = false
+              this.newBlack = false
+              this.newGreen = !this.newGreen
+              this.newSelectColor = 'green'
+            }
+
+            if(this.newBlack == false && this.newRed == false && this.newGreen == false){
+              this.newSelectColor = ''
+              this.error.colorError = 'Please select color'
+            }
+            else{
+              this.error.colorError = ''
+            }
+          },
+          selectColor2(color){
+            if(color == 'black'){
+              this.editRed = false
+              this.editBlack = !this.editBlack
+              this.editGreen = false
+              this.editSelectColor = 'black'
+            }
+            else if(color == 'red'){
+              this.editRed = !this.editRed
+              this.editBlack = false
+              this.editGreen = false
+              this.editSelectColor = 'red'
+            }
+            else if(color == 'green'){
+              this.editRed = false
+              this.editBlack = false
+              this.editGreen = !this.editGreen
+              this.editSelectColor = 'green'
+            }
+
+            if(this.editBlack == false && this.editRed == false && this.editGreen == false){
+              this.editSelectColor = ''
+              this.error.editColorError = 'Please select color'
+            }
+            else{
+              this.error.editColorError = ''
+            }
+          },
+          validateTaskName(){
+            if(this.newTaskName === ''){
+              this.error.taskNameError = 'Please enter your task'
+              return
+            }
+            this.error.taskNameError = ''
+          },
+          validateEditTaskName(){
+            if(this.editTaskName === ''){
+              this.error.editTaskNameError = 'Please enter your task'
+              return
+            }
+            this.error.editTaskNameError = ''
+          },
+          validateNewListName(){
+            if(this.newListName == ''){
+              this.error.newListName = 'Please enter list name'
+              return
+            }
+            this.error.newListName = ''
+          },
+          validateEditListName(){
+            if(this.editListName == ''){
+              this.error.editListName = 'Please enter list name'
+              return
+            }
+            this.error.editListName = ''
+          },
+          validateNewDropdown(){
+            if(this.newDropdown == '0'){
+              this.error.newDropdownError = 'Please select list name'
+              return
+            }
+            this.error.newDropdownError = ''
+          },
+          validateEditDropdown(){
+            if(this.editDropdown == '0'){
+              this.error.editDropdownError = 'Please select list name'
+              return
+            }
+            this.error.editDropdownError = ''
+          },
+          addNewList(){
+            this.showNewListModal = true
+          },
+          confirmNewList(){
+            if(this.newListName == ''){
+              alert('กรุณากรอกชื่อ')
+              return
+            }
+            this.listCounter++
+            const newlist = {id: this.listCounter, name: this.newListName}
+            this.todoLists.push(newlist)
+            this.hideComplete.push(false)
+            this.showFlagged.push(false)
+            this.sortBy.push('sortByAlphabet')
+
+            this.newListName = ''
+            this.showNewListModal = false
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
